@@ -1,6 +1,8 @@
 package edu.uky.irnc.streamserver.sresource;
 
 import java.text.ParseException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.espertech.esper.client.Configuration;
 import com.espertech.esper.client.EPAdministrator;
@@ -25,7 +27,19 @@ public class ESPERNetFlow implements Runnable {
     private String amqp_server;
     private String amqp_login;
     private String amqp_password;
-    private String query_string;
+    private static String query_string;
+
+    private static String talkerLimit;
+
+    private static ConnectionFactory factory;
+    private static Connection connection;
+    private static QueueingConsumer consumer;
+    private static EPAdministrator cepAdm;
+
+    private static EPStatement cepStatement;
+    private static CEPListener c;
+
+    private static Pattern p = Pattern.compile("(\\d+), bytes");
 
     //ESPER
     private static EPRuntime cepRT;
@@ -38,15 +52,17 @@ public class ESPERNetFlow implements Runnable {
         this.inExchange = inExchange;
         this.query_string = query_string;
 
+        Matcher m = p.matcher(this.query_string);
+
+        if (m.find()) {
+            this.talkerLimit = m.group(1);
+        }
+
         gson = new GsonBuilder().create();
     }
 
     public void run() {
         try {
-            ConnectionFactory factory;
-            Connection connection;
-            QueueingConsumer consumer;
-            EPAdministrator cepAdm;
 
             // START AMQP
             factory = new ConnectionFactory();
@@ -81,7 +97,7 @@ public class ESPERNetFlow implements Runnable {
             System.out.println("ESPEREngine: Active");
             System.out.println("Input Exchange: " + inExchange + " output console");
 
-            try {
+            /*try {
                 EPStatement cepStatement = cepAdm.createEPL(query_string);
                 CEPListener c = new CEPListener();
                 cepStatement.addListener(c);
@@ -89,7 +105,8 @@ public class ESPERNetFlow implements Runnable {
             } catch (Exception ex) {
                 System.out.println("Failed to add Query: \"" + query_string + "\"");
                 ex.printStackTrace();
-            }
+            }*/
+            ESPERNetFlow.updateQuery("10");
             while (Main.ESPERActive) {
                 try {
                     QueueingConsumer.Delivery delivery = consumer.nextDelivery(500);
@@ -106,6 +123,29 @@ public class ESPERNetFlow implements Runnable {
             }
         } catch (Exception ex) {
             System.out.println("QueryNode Error: " + ex.toString());
+        }
+    }
+
+    public static void updateQuery(String limit) {
+        Matcher m = p.matcher(query_string);
+        StringBuffer result = new StringBuffer();
+        if (m.find()) {
+            m.appendReplacement(result, limit + ", bytes");
+        }
+        m.appendTail(result);
+        query_string = result.toString();
+        try {
+            if (cepStatement != null) {
+                cepStatement.removeAllListeners();
+                cepStatement.destroy();
+            }
+            cepStatement = cepAdm.createEPL(query_string);
+            c = new CEPListener();
+            cepStatement.addListener(c);
+            System.out.println("Added Query: \"" + query_string + "\"");
+        } catch (Exception ex) {
+            System.out.println("Failed to add Query: \"" + query_string + "\"");
+            ex.printStackTrace();
         }
     }
 
