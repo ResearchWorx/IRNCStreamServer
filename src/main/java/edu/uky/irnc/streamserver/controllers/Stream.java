@@ -10,38 +10,50 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Path("/")
 public class Stream {
-    private static final Object latestLock = new Object();
-    private static List<EventBean> latest = new ArrayList<EventBean>();
+    private static ConcurrentHashMap<String, List<EventBean> > latest = new ConcurrentHashMap<String, List<EventBean>>();
 
     @GET
+    @Path("/results/{exchange}")
     @Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
-    public Response getLatest() {
+    public Response getLatest(@PathParam("exchange") String exchange) {
         StringBuilder sb = new StringBuilder();
-        synchronized (latestLock) {
-            sb.append("[");
-            for (int i = 0; i < latest.size() - 1; i++) {
-                sb.append(latest.get(i).getUnderlying().toString());
+        sb.append("[");
+        List<EventBean> currLatest = latest.get(exchange);
+        if (currLatest != null) {
+            for (int i = 0; i < currLatest.size() - 1; i++) {
+                sb.append(currLatest.get(i).getUnderlying().toString());
                 sb.append(",");
             }
-            if (latest.size() > 1) {
-                sb.append(latest.get(latest.size() - 1).getUnderlying().toString());
+            if (currLatest.size() > 1) {
+                sb.append(currLatest.get(currLatest.size() - 1).getUnderlying().toString());
             }
-            sb.append("]");
         }
+        sb.append("]");
         return Response.ok(sb.toString()).build();
     }
 
-    public static void updateLatest(EventBean[] events) {
-        synchronized (latestLock) {
-            latest = new ArrayList<EventBean>();
-            latest.addAll(Arrays.asList(events));
+    @GET
+    @Path("/list")
+    @Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
+    public Response exchangeList() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        int currIndex = 0;
+        for (String key : latest.keySet()) {
+            sb.append("\"");
+            sb.append(key);
+            sb.append("\"");
+            if (++currIndex < latest.keySet().size()) {
+                sb.append(",");
+            }
         }
+        sb.append("]");
+        return Response.ok(sb.toString()).build();
     }
 
     @GET
@@ -65,7 +77,12 @@ public class Stream {
         } catch (NumberFormatException e) {
             return Response.status(500).entity(limit + " is not a number").build();
         }
-        ESPERNetFlow.updateQuery(limit);
+        ESPERNetFlow.updateAllQuery(limit);
         return Response.ok(limit).build();
+    }
+
+    public static void updateLatest(String  exchange, EventBean[] events) {
+        latest.put(exchange, new ArrayList<EventBean>());
+        latest.get(exchange).addAll(Arrays.asList(events));
     }
 }

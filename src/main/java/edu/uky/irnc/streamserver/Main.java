@@ -73,16 +73,20 @@ public class Main {
         //create config
         conf = new Config(checkConfig(args));
 
-        //System.out.println(conf.getConfig("general", "amqp_server"));
         String amqp_server = conf.getConfig("amqp", "server");
         String amqp_login = conf.getConfig("amqp", "login");
         String amqp_password = conf.getConfig("amqp", "password");
-        String amqp_inexchange = conf.getConfig("amqp", "inexchange");
+        int exchange_count = Integer.parseInt(conf.getConfig("amqp", "exchanges"));
+
         String querystring = conf.getConfig("cep", "querystring");
 
-        ESPERNetFlow enf = new ESPERNetFlow(amqp_server, amqp_login, amqp_password, amqp_inexchange, querystring);
-        Thread et = new Thread(enf);
-        et.start();
+        for (int i = 0; i < exchange_count; i++) {
+            String ampq_inexchange = conf.getConfig("exchange" + i, "inexchange");
+            new Thread(new ESPERNetFlow(amqp_server, amqp_login, amqp_password, ampq_inexchange, querystring)).start();
+        }
+
+        ESPERNetFlow.updateAllQuery("10");
+
         // Grizzly 2 initialization
         startServer();
     }    

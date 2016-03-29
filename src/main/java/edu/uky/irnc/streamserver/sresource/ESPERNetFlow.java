@@ -1,6 +1,8 @@
 package edu.uky.irnc.streamserver.sresource;
 
 import java.text.ParseException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,28 +24,22 @@ import edu.uky.irnc.streamserver.Main;
 import edu.uky.irnc.streamserver.controllers.Stream;
 
 public class ESPERNetFlow implements Runnable {
+    private static Pattern p = Pattern.compile("(\\d+), bytes");
+    private static Gson gson = new GsonBuilder().create();
+
     //AMQP
     private String inExchange;
     private String amqp_server;
     private String amqp_login;
     private String amqp_password;
-    private static String query_string;
-
-    private static String talkerLimit;
-
-    private static ConnectionFactory factory;
-    private static Connection connection;
-    private static QueueingConsumer consumer;
-    private static EPAdministrator cepAdm;
-
-    private static EPStatement cepStatement;
-    private static CEPListener c;
-
-    private static Pattern p = Pattern.compile("(\\d+), bytes");
+    private String query_string;
 
     //ESPER
-    private static EPRuntime cepRT;
-    private static Gson gson;
+    private EPRuntime cepRT;
+    private EPAdministrator cepAdm;
+    private EPStatement cepStatement;
+
+    private static Map<String, ESPERNetFlow> instances = new HashMap<String, ESPERNetFlow>();
 
     public ESPERNetFlow(String amqp_server, String amqp_login, String amqp_password, String inExchange, String query_string) {
         this.amqp_server = amqp_server;
@@ -52,17 +48,29 @@ public class ESPERNetFlow implements Runnable {
         this.inExchange = inExchange;
         this.query_string = query_string;
 
-        Matcher m = p.matcher(this.query_string);
+        instances.put(inExchange, this);
 
-        if (m.find()) {
-            this.talkerLimit = m.group(1);
-        }
+        Stream.updateLatest(this.inExchange, new EventBean[0]);
 
-        gson = new GsonBuilder().create();
+        //START ESPER
+
+        //The Configuration is meant only as an initialization-time object.
+        Configuration cepConfig = new Configuration();
+        cepConfig.addEventType("netFlow", netFlow.class.getName());
+        EPServiceProvider cep = EPServiceProviderManager.getProvider("myCEPEngine", cepConfig);
+        cepRT = cep.getEPRuntime();
+        cepAdm = cep.getEPAdministrator();
+
+
+        //END ESPER
     }
 
     public void run() {
         try {
+
+            ConnectionFactory factory;
+            Connection connection;
+            QueueingConsumer consumer;
 
             // START AMQP
             factory = new ConnectionFactory();
@@ -83,34 +91,12 @@ public class ESPERNetFlow implements Runnable {
             //END RX
             // END AMQP
 
-            //START ESPER
-
-            //The Configuration is meant only as an initialization-time object.
-            Configuration cepConfig = new Configuration();
-            cepConfig.addEventType("netFlow", netFlow.class.getName());
-            EPServiceProvider cep = EPServiceProviderManager.getProvider("myCEPEngine", cepConfig);
-            cepRT = cep.getEPRuntime();
-            cepAdm = cep.getEPAdministrator();
-
-            //END ESPER
-
-            System.out.println("ESPEREngine: Active");
             System.out.println("Input Exchange: " + inExchange + " output console");
 
-            /*try {
-                EPStatement cepStatement = cepAdm.createEPL(query_string);
-                CEPListener c = new CEPListener();
-                cepStatement.addListener(c);
-                System.out.println("Added Query: \"" + query_string + "\"");
-            } catch (Exception ex) {
-                System.out.println("Failed to add Query: \"" + query_string + "\"");
-                ex.printStackTrace();
-            }*/
-            ESPERNetFlow.updateQuery("10");
             while (Main.ESPERActive) {
                 try {
                     QueueingConsumer.Delivery delivery = consumer.nextDelivery(500);
-                    if (!(delivery == null)) {
+                    if (delivery != null) {
                         String message = new String(delivery.getBody());
                         //pass messages to processor
                         input(message);
@@ -126,7 +112,8 @@ public class ESPERNetFlow implements Runnable {
         }
     }
 
-    public static void updateQuery(String limit) {
+    private void updateQuery(String limit) {
+        System.out.println("Updating limit on [" + inExchange + "]");
         Matcher m = p.matcher(query_string);
         StringBuffer result = new StringBuffer();
         if (m.find()) {
@@ -140,23 +127,31 @@ public class ESPERNetFlow implements Runnable {
                 cepStatement.destroy();
             }
             cepStatement = cepAdm.createEPL(query_string);
-            c = new CEPListener();
+            CEPListener c = new CEPListener(inExchange);
             cepStatement.addListener(c);
-            System.out.println("Added Query: \"" + query_string + "\"");
+            System.out.println("Query[" + inExchange + "]: \"" + query_string + "\"");
         } catch (Exception ex) {
             System.out.println("Failed to add Query: \"" + query_string + "\"");
             ex.printStackTrace();
         }
     }
 
-    private static class CEPListener implements UpdateListener {
-        CEPListener() {
+    public static void updateAllQuery(String limit) {
+        for (ESPERNetFlow entry : instances.values()) {
+            entry.updateQuery(limit);
+        }
+    }
 
+    private static class CEPListener implements UpdateListener {
+        private String exchange;
+        CEPListener(String exchange) {
+            this.exchange = exchange;
         }
 
         public void update(EventBean[] newEvents, EventBean[] oldEvents) {
+            System.out.println("Updating latest on [" + this.exchange + "]");
             if (newEvents != null) {
-                Stream.updateLatest(newEvents);
+                Stream.updateLatest(this.exchange, newEvents);
             }
             if (oldEvents != null) {
                 System.out.println("Old Event received: " + oldEvents[0].getUnderlying());
@@ -164,7 +159,7 @@ public class ESPERNetFlow implements Runnable {
         }
     }
 
-    private static void input(String inputStr) throws ParseException {
+    private void input(String inputStr) throws ParseException {
         try {
             netFlow flow = nFlowFromJson(inputStr);
             cepRT.sendEvent(flow);
@@ -172,10 +167,9 @@ public class ESPERNetFlow implements Runnable {
             System.out.println("ESPEREngine : Input netFlow Error : " + ex.toString());
             System.out.println("ESPEREngine : Input netFlow Error : InputStr " + inputStr);
         }
-
     }
 
-    private static netFlow nFlowFromJson(String json) {
+    private netFlow nFlowFromJson(String json) {
         return gson.fromJson(json, netFlow.class);
     }
 }
