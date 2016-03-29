@@ -57,17 +57,15 @@ public class ESPERNetFlow implements Runnable {
         //The Configuration is meant only as an initialization-time object.
         Configuration cepConfig = new Configuration();
         cepConfig.addEventType("netFlow", netFlow.class.getName());
-        EPServiceProvider cep = EPServiceProviderManager.getProvider("myCEPEngine", cepConfig);
+        EPServiceProvider cep = EPServiceProviderManager.getProvider(this.inExchange + "_provider", cepConfig);
         cepRT = cep.getEPRuntime();
         cepAdm = cep.getEPAdministrator();
-
 
         //END ESPER
     }
 
     public void run() {
         try {
-
             ConnectionFactory factory;
             Connection connection;
             QueueingConsumer consumer;
@@ -129,7 +127,7 @@ public class ESPERNetFlow implements Runnable {
             cepStatement = cepAdm.createEPL(query_string);
             CEPListener c = new CEPListener(inExchange);
             cepStatement.addListener(c);
-            System.out.println("Query[" + inExchange + "]: \"" + query_string + "\"");
+            System.out.println("Query [" + inExchange + "]: \"" + query_string + "\"");
         } catch (Exception ex) {
             System.out.println("Failed to add Query: \"" + query_string + "\"");
             ex.printStackTrace();
@@ -142,14 +140,14 @@ public class ESPERNetFlow implements Runnable {
         }
     }
 
-    private static class CEPListener implements UpdateListener {
+    private class CEPListener implements UpdateListener {
         private String exchange;
         CEPListener(String exchange) {
             this.exchange = exchange;
         }
 
         public void update(EventBean[] newEvents, EventBean[] oldEvents) {
-            System.out.println("Updating latest on [" + this.exchange + "]");
+            //System.out.println("Updating latest on [" + this.exchange + "]");
             if (newEvents != null) {
                 Stream.updateLatest(this.exchange, newEvents);
             }
@@ -162,6 +160,7 @@ public class ESPERNetFlow implements Runnable {
     private void input(String inputStr) throws ParseException {
         try {
             netFlow flow = nFlowFromJson(inputStr);
+            //System.out.println("Adding flow [" + inExchange + "] from " + flow.ip_src + " to " + flow.ip_dst);
             cepRT.sendEvent(flow);
         } catch (Exception ex) {
             System.out.println("ESPEREngine : Input netFlow Error : " + ex.toString());

@@ -34,7 +34,7 @@ public class Stream {
             }
         }
         sb.append("]");
-        return Response.ok(sb.toString()).build();
+        return Response.ok(sb.toString()).header("Access-Control-Allow-Origin", "*").build();
     }
 
     @GET
@@ -53,14 +53,14 @@ public class Stream {
             }
         }
         sb.append("]");
-        return Response.ok(sb.toString()).build();
+        return Response.ok(sb.toString()).header("Access-Control-Allow-Origin", "*").build();
     }
 
     @GET
     @Path("/limit")
     @Produces(MediaType.TEXT_PLAIN)
     public Response emptyLimit() {
-        return Response.status(500).entity("Please enter a valid integer for new limit").build();
+        return Response.status(500).entity("Please enter a valid integer for new limit").header("Access-Control-Allow-Origin", "*").build();
     }
 
     @GET
@@ -78,7 +78,7 @@ public class Stream {
             return Response.status(500).entity(limit + " is not a number").build();
         }
         ESPERNetFlow.updateAllQuery(limit);
-        return Response.ok(limit).build();
+        return Response.ok(limit).header("Access-Control-Allow-Origin", "*").build();
     }
 
     public static void updateLatest(String  exchange, EventBean[] events) {
