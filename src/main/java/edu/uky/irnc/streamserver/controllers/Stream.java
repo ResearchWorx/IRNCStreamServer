@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Path("/")
 public class Stream {
-    private static ConcurrentHashMap<String, List<EventBean> > latest = new ConcurrentHashMap<String, List<EventBean>>();
+    private static HashMap<String, List<EventBean> > latest = new HashMap<String, List<EventBean>>();
 
     @GET
     @Path("/results/{exchange}")
@@ -23,14 +23,16 @@ public class Stream {
     public Response getLatest(@PathParam("exchange") String exchange) {
         StringBuilder sb = new StringBuilder();
         sb.append("[");
-        List<EventBean> currLatest = latest.get(exchange);
-        if (currLatest != null) {
-            for (int i = 0; i < currLatest.size() - 1; i++) {
-                sb.append(currLatest.get(i).getUnderlying().toString());
-                sb.append(",");
-            }
-            if (currLatest.size() > 1) {
-                sb.append(currLatest.get(currLatest.size() - 1).getUnderlying().toString());
+        synchronized (latest) {
+            List<EventBean> currLatest = latest.get(exchange);
+            if (currLatest != null) {
+                for (int i = 0; i < currLatest.size() - 1; i++) {
+                    sb.append(currLatest.get(i).getUnderlying().toString());
+                    sb.append(",");
+                }
+                if (currLatest.size() > 1) {
+                    sb.append(currLatest.get(currLatest.size() - 1).getUnderlying().toString());
+                }
             }
         }
         sb.append("]");
@@ -82,7 +84,9 @@ public class Stream {
     }
 
     public static void updateLatest(String  exchange, EventBean[] events) {
-        latest.put(exchange, new ArrayList<EventBean>());
-        latest.get(exchange).addAll(Arrays.asList(events));
+        synchronized (latest) {
+            latest.put(exchange, new ArrayList<EventBean>());
+            latest.get(exchange).addAll(Arrays.asList(events));
+        }
     }
 }
