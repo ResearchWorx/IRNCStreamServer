@@ -9,11 +9,25 @@
 
     <properties>
         <jarName>StreamServer</jarName>
-        <mainClass>edu.uky.irnc.streamserver.Main</mainClass>
-        <jersey-version>1.19.1</jersey-version>
+        <mainClass>edu.uky.irnc.streamserver.core.Main</mainClass>
+        <jersey-version>1.19.4</jersey-version>
+        <cresco.plugin.library.version>0.5.2</cresco.plugin.library.version>
+        <jdk>1.8</jdk>
+        <maven.source.version>3.0.0</maven.source.version>
+        <maven.javadoc.version>2.10.3</maven.javadoc.version>
+        <maven.compiler.version>3.5.1</maven.compiler.version>
     </properties>
 
+
     <dependencies>
+
+        <dependency>
+            <groupId>com.researchworx.cresco</groupId>
+            <artifactId>cresco-plugin-library</artifactId>
+            <version>${cresco.plugin.library.version}</version>
+        </dependency>
+
+
         <dependency>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-grizzly2</artifactId>
@@ -99,12 +113,13 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <inherited>true</inherited>
+                <version>${maven.compiler.version}</version>
                 <configuration>
-                    <source>1.6</source>
-                    <target>1.6</target>
+                    <source>${jdk}</source>
+                    <target>${jdk}</target>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -117,7 +132,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>edu.uky.irnc.streamserver.Main</mainClass>
+                    <mainClass>edu.uky.irnc.streamserver.core.Main</mainClass>
                 </configuration>
             </plugin>
             <plugin>

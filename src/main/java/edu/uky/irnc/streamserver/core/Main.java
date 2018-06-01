@@ -1,10 +1,9 @@
 
-package edu.uky.irnc.streamserver;
+package edu.uky.irnc.streamserver.core;
 
 import com.sun.jersey.api.container.grizzly2.GrizzlyServerFactory;
 import com.sun.jersey.api.core.PackagesResourceConfig;
 import com.sun.jersey.api.core.ResourceConfig;
-import edu.uky.irnc.streamserver.core.Config;
 import edu.uky.irnc.streamserver.sresource.ESPERNetFlow;
 import org.glassfish.grizzly.http.server.HttpServer;
 
@@ -39,6 +38,7 @@ public class Main {
     private static HttpServer startServer() throws IOException {
         ResourceConfig resourceConfig = new PackagesResourceConfig("edu.uky.irnc.streamserver.controllers");
 
+
         System.out.println("Starting grizzly2...");
         return GrizzlyServerFactory.createHttpServer(BASE_URI, resourceConfig);
     }
@@ -68,6 +68,8 @@ public class Main {
     }
     
     public static void main(String[] args) throws IOException {
+
+
         Config conf;
 
         //create config
@@ -87,7 +89,10 @@ public class Main {
 
         ESPERNetFlow.updateAllQuery("10");
 
+
+
         // Grizzly 2 initialization
         startServer();
+
     }    
 }

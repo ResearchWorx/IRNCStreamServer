@@ -9,12 +9,13 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-@Path("/stream")
-public class Stream {
+@Path("/tenant")
+public class Tenant {
     private static HashMap<String, List<EventBean> > latest = new HashMap<String, List<EventBean>>();
 
     @GET
